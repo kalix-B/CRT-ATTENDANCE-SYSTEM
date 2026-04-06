@@ -1,0 +1,200 @@
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:"Segoe UI", sans-serif;
+}
+
+body{
+    height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    background:linear-gradient(135deg,#257bd0,#ffffff);
+}
+
+.navbar {
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    padding: 1rem 5%; 
+    position: fixed; 
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1000; 
+    box-sizing: border-box;
+    font-family: sans-serif;
+    color: white;
+
+    
+    background-color: rgba(255, 255, 255, 0.1); 
+    backdrop-filter: blur(15px); 
+    -webkit-backdrop-filter: blur(15px); 
+    
+    
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1); 
+}
+.logo {
+    display: flex;         
+    align-items: center;   
+    gap: 12px;              
+}
+
+.logo img {
+    display: block; 
+    flex-shrink: 0;        
+}
+
+.wrapper{
+    width:100%;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+.card{
+    width:600px;
+    padding:100px;
+    border-radius:16px;
+    background:rgba(107, 105, 105, 0.15);
+    backdrop-filter:blur(15px);
+    -webkit-backdrop-filter:blur(15px);
+    border:1px solid rgba(255,255,255,0.3);
+    box-shadow:0 15px 40px rgba(0,0,0,0.2);
+    text-align:center;
+    color:white;
+}
+
+.title{
+    font-weight:600;
+    margin-bottom:10px;
+    font-size:28px;
+}
+
+.subtitle{
+    margin-bottom:100px;
+    font-size:16px;
+    color:#ffffff;
+    font-size: 20px;
+}
+
+/* Grid layout for buttons */
+.subject-grid{
+    display:grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap:20px;
+}
+
+/* Buttons */
+.subject-btn{
+    padding:40px 20px;
+    border-radius:12px;
+    background:rgba(255,255,255,0.15);
+    backdrop-filter:blur(10px);
+    -webkit-backdrop-filter:blur(10px);
+    border:1px solid rgba(255,255,255,0.3);
+    box-shadow:0 8px 20px rgba(0,0,0,0.25);
+    cursor:pointer;
+    transition:0.3s;
+    font-weight:600;
+    font-size:18px;
+    color:white;
+}
+
+.subject-btn:hover{
+    background:rgba(255,255,255,0.25);
+    transform: translateY(-5px);
+}
+
+/* Selected effect */
+.subject-btn.selected{
+    background:rgba(255,255,255,0.35);
+    color:#333;
+    transform: translateY(-3px);
+    border-color:white;
+}
+
+/* Modal background */
+.modal{
+    display:none;
+    position:fixed;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    background:rgba(0,0,0,0.5);
+    backdrop-filter:blur(5px);
+    -webkit-backdrop-filter:blur(5px);
+    justify-content:center;
+    align-items:center;
+    z-index:1000;
+    border-radius:16px;
+}
+
+/* Modal content */
+.modal-content{
+    background:rgba(255,255,255,0.15);
+    backdrop-filter:blur(15px);
+    -webkit-backdrop-filter:blur(15px);
+    border:1px solid rgba(255,255,255,0.3);
+    padding:30px;
+    border-radius:16px;
+    width:300px;
+    text-align:center;
+    box-shadow:0 10px 30px rgba(0,0,0,0.25);
+    color:white;
+}
+
+/* Close button */
+.modal .close{
+    position:absolute;
+    top:20px;
+    right:20px;
+    font-size:24px;
+    cursor:pointer;
+}
+
+/* Input inside modal */
+.modal input{
+    width:100%;
+    padding:12px;
+    border-radius:8px;
+    border:1px solid #ddd;
+    outline:none;
+    margin-bottom:20px;
+}
+
+/* Add button inside modal */
+.modal .continue-btn{
+    padding:12px 20px;
+    border:none;
+    border-radius:8px;
+    background:#54596d;
+    color:white;
+    cursor:pointer;
+    font-weight:500;
+}
+
+.modal .continue-btn:hover{
+    background:#6b6b6b77;
+}
+
+.back-btn{
+    padding:8px 16px;
+    border:none;
+    border-radius:8px;
+    background:rgba(255,255,255,0.2);
+    color:white;
+    font-weight:500;
+    cursor:pointer;
+    margin-bottom:20px;
+    transition:0.2s;
+    position: absolute; top: 50px; left: 40px;
+}
+
+.back-btn:hover{
+    background:rgba(255,255,255,0.35);
+    transform:translateY(-2px);
+}

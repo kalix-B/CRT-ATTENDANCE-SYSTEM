@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Dashboard - CRT Attendance</title>
+    <link rel="stylesheet" href="teacher.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<div class="wrapper">
+    <nav class="navbar">
+        <div class="logo">
+            <img src="logo.jpg" alt="Logo" style="height: 50px; width: 50px;">
+            CRT ATTENDANCE SYSTEM
+        </div>
+    </nav>
+
+    <header class="topbar">
+        <div class="header-info">
+            <h1 class="welcome" id="welcomeMsg">Welcome, Teacher</h1>
+            <p id="subjectLabel" class="welcome-sub"></p>
+        </div>
+        <button class="logout" onclick="logout()">Logout</button>
+    </header>
+
+    <main class="container">
+        <div class="attendance-actions">
+            <button onclick="sendAttendanceRequest()" class="filter-btn primary">Send Request</button>
+            <button onclick="stopAttendanceRequest()" class="filter-btn" style="background: #f87171; border: 1px solid #ef4444;">Stop Request</button>
+            <button onclick="deleteAllAttendance()" class="filter-btn danger-btn">Delete All</button>
+            <button onclick="goToQRPage()" class="filter-btn qr-btn">QR Code</button>
+            
+            <div style="display: inline-flex; flex-direction: column; vertical-align: middle; margin-left: 15px;">
+                <span id="requestStatus">Checking status...</span>
+                <span id="timerDisplay" style="font-size: 0.85rem; color: #fbbf24; font-weight: bold; margin-top: 2px;"></span>
+            </div>
+        </div>
+
+        <div class="filter-buttons">
+            <button onclick="filterTable('all')" class="filter-btn active" id="filter-all">All</button>
+            <button onclick="filterTable('Approved')" class="filter-btn" id="filter-approved">Approved</button>
+            <button onclick="filterTable('Rejected')" class="filter-btn" id="filter-rejected">Rejected</button>
+        </div>
+
+        <div class="table-section">
+            <h3>Student Attendance</h3>
+            <table id="attendanceTable">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Date</th>
+                        <th>Time In</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="attendanceBody">
+                    <tr><td colspan="5" style="text-align:center; color:#aaa;">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+</div>
+
+<script>
+    const { createClient } = supabase;
+    const db = createClient(
+        'https://cvmfvndfmzmhywttaujy.supabase.co', 
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN2bWZ2bmRmbXptaHl3dHRhdWp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMjgwOTQsImV4cCI6MjA4ODcwNDA5NH0.1mzfGgPWNPRyb1pwra2KTrayCzAqhyn7p5CGEb4UItE'
+    );
+
+async function deleteAllAttendance() {
+    // 1. Safety Confirmation
+    const confirmDelete = confirm("⚠️ WARNING: This will permanently delete ALL attendance records for this subject. This cannot be undone. Proceed?");
+    
+    if (confirmDelete) {
+        const pin = prompt("To confirm, please type 'DELETE' in all caps:");
+        
+        if (pin === "DELETE") {
+            // 2. Database Operation
+            const { error } = await db
+                .from('attendance')
+                .delete()
+                .eq('subject_id', subject.id); // Deletes only for the current subject
+
+            if (error) {
+                console.error("Delete Error:", error.message);
+                alert("Database Error: " + error.message);
+            } else {
+                // 3. UI Update
+                alert("All records for " + subject.name + " have been cleared.");
+                allRows = []; // Clear local memory
+                renderTable(currentFilter); // Refresh the table on screen
+            }
+        } else {
+            alert("Delete cancelled. You must type 'DELETE' exactly.");
+        }
+    }
+}
+
+    async function stopAttendanceRequest() {
+    // 1. Confirm with the teacher
+    if (!confirm("Are you sure you want to stop the current attendance session? Students will no longer be able to scan.")) return;
+
+    // 2. Update Supabase to close ALL active requests for this subject
+    const { error } = await db
+        .from('attendance_requests')
+        .update({ is_open: false })
+        .eq('subject_id', subject.id)
+        .eq('is_open', true);
+
+    if (error) {
+        console.error("Error stopping request:", error.message);
+        alert("Failed to stop request: " + error.message);
+    } else {
+        // 3. Clear the local session and UI
+        sessionStorage.removeItem('activeRequestId');
+        clearInterval(countdownInterval);
+        
+        document.getElementById('requestStatus').textContent = 'No active request.';
+        document.getElementById('requestStatus').style.color = '#aaa';
+        document.getElementById('timerDisplay').textContent = "";
+        
+        alert("Attendance session stopped successfully.");
+        
+        // 4. Refresh the data
+        loadAttendance();
+    }
+}
+
+    const user = JSON.parse(sessionStorage.getItem('user'));
+    const subject = JSON.parse(sessionStorage.getItem('subject'));
+    let countdownInterval;
+    let currentFilter = 'all';
+    let allRows = [];
+
+    if (!user || !subject) {
+        window.location.href = 'index.html';
+    } else {
+        document.getElementById('welcomeMsg').textContent = 'Welcome, ' + user.name;
+        document.getElementById('subjectLabel').textContent = 'Subject: ' + subject.name;
+    }
+
+    function logout() { sessionStorage.clear(); window.location.href = 'index.html'; }
+    
+    // Fixed: Capture the Request ID before moving to QR page
+    function goToQRPage() { 
+        const activeReq = allRows.length > 0 ? sessionStorage.getItem('activeRequestId') : null;
+        window.location.href = 'qr-page.html'; 
+    }
+
+    async function checkActiveRequest() {
+        const statusEl = document.getElementById('requestStatus');
+        const timerEl = document.getElementById('timerDisplay');
+        const { data } = await db.from('attendance_requests').select('*').eq('subject_id', subject.id).eq('is_open', true).order('created_at', { ascending: false }).limit(1).maybeSingle();
+
+        if (data && new Date(data.expires_at).getTime() > new Date().getTime()) {
+            statusEl.textContent = '✅ Request Active';
+            statusEl.style.color = '#4ade80';
+            sessionStorage.setItem('activeRequestId', data.id); // Ensure ID is saved
+            startCountdown(data.expires_at);
+        } else {
+            statusEl.textContent = 'No active request.';
+            statusEl.style.color = '#aaa';
+            timerEl.textContent = "";
+            clearInterval(countdownInterval);
+        }
+    }
+
+    function startCountdown(expiryTime) {
+        clearInterval(countdownInterval);
+        const timerEl = document.getElementById('timerDisplay');
+        const target = new Date(expiryTime).getTime();
+
+        countdownInterval = setInterval(() => {
+            const now = new Date().getTime();
+            const distance = target - now;
+            if (distance <= 0) {
+                clearInterval(countdownInterval);
+                timerEl.textContent = "";
+                checkActiveRequest();
+                return;
+            }
+            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+            timerEl.textContent = `Expires in: ${minutes}m ${seconds}s`;
+        }, 1000);
+    }
+
+    async function loadAttendance() {
+        await checkActiveRequest();
+        const { data, error } = await db.from('attendance').select('*').eq('subject_id', subject.id).order('created_at', { ascending: false });
+        if (!error) { 
+            allRows = data; 
+            renderTable(currentFilter); 
+        }
+    }
+
+    function renderTable(filter) {
+        const tbody = document.getElementById('attendanceBody');
+        const rows = filter === 'all' ? allRows : allRows.filter(r => r.status === filter);
+        
+        if (rows.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#aaa;">No records found.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = rows.map(r => {
+            // FIX: Allow buttons if status is 'Pending' OR 'Present' (from QR scan)
+            const showButtons = (r.status !== 'Approved' && r.status !== 'Rejected');
+            
+            return `
+                <tr>
+                    <td data-label="Name">${r.student_name || 'Anonymous'}</td>
+                    <td data-label="Date">${r.date}</td>
+                    <td data-label="Time In">${r.time_in || '—'}</td>
+                    <td data-label="Status" style="color: ${getStatusColor(r.status)}; font-weight: bold;">${r.status}</td>
+                    <td data-label="Action">
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            ${showButtons 
+                                ? `<button class="btn-action approve" onclick="updateStatus('${r.id}', 'Approved')">Approve</button>
+                                   <button class="btn-action reject" onclick="updateStatus('${r.id}', 'Rejected')">Reject</button>`
+                                : '<span>✅ Finalized</span>'
+                            }
+                            <button class="btn-delete-small" onclick="deleteAttendance('${r.id}')" title="Delete Row">🗑️</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function getStatusColor(status) {
+        if (status === 'Approved') return '#4ade80';
+        if (status === 'Rejected') return '#f87171';
+        if (status === 'Present') return '#60a5fa'; // Blue for QR scans
+        return '#fbbf24'; // Yellow for Pending
+    }
+
+    // FIX: Optimized Update Status
+    async function updateStatus(id, newStatus) {
+        const { error } = await db.from('attendance')
+            .update({ status: newStatus })
+            .eq('id', id);
+        
+        if (error) {
+            alert("Error updating status: " + error.message);
+        } else {
+            // Update local data immediately for a fast UI feel
+            allRows = allRows.map(row => row.id === id ? { ...row, status: newStatus } : row);
+            renderTable(currentFilter);
+        }
+    }
+
+    async function deleteAttendance(id) {
+        if (!confirm("Delete this record permanently?")) return;
+        const { error } = await db.from('attendance').delete().eq('id', id);
+        if (!error) { 
+            allRows = allRows.filter(row => row.id !== id); 
+            renderTable(currentFilter); 
+        }
+    }
+
+    async function sendAttendanceRequest() {
+        const todayStr = new Date().toLocaleDateString('en-CA');
+        const expiresAt = new Date(new Date().getTime() + 60 * 60 * 1000).toISOString();
+        
+        await db.from('attendance_requests').update({ is_open: false }).eq('subject_id', subject.id);
+        
+        const { data, error } = await db.from('attendance_requests')
+            .insert({ subject_id: subject.id, requested_by: user.id, date: todayStr, is_open: true, expires_at: expiresAt })
+            .select('id')
+            .single();
+
+        if (error) {
+            alert(error.message);
+        } else {
+            sessionStorage.setItem('activeRequestId', data.id);
+            loadAttendance();
+        }
+    }
+
+    function filterTable(filter) {
+        currentFilter = filter;
+        document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+        const btnId = `filter-${filter.toLowerCase()}`;
+        if(document.getElementById(btnId)) document.getElementById(btnId).classList.add('active');
+        renderTable(filter);
+    }
+
+    // Initial load
+    loadAttendance();
+    // Refresh every 10 seconds
+    setInterval(loadAttendance, 10000);
+</script>
+</body>
+</html>

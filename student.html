@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student Dashboard</title>
+<link rel="stylesheet" href="student.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
+<style>
+    /* Styling to keep the camera neat within your card */
+    #reader {
+        width: 100%;
+        max-width: 350px;
+        margin: 10px auto;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 2px solid #fbbf24;
+        display: none; /* Hidden until button is clicked */
+    }
+    .scan-btn {
+        background-color: #fbbf24;
+        color: #111827;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 5px;
+        font-weight: bold;
+        cursor: pointer;
+        margin-top: 10px;
+    }
+</style>
+</head>
+<body>
+<nav class="navbar">
+    <div class="logo">
+    <img src="logo.jpg" alt="Logo" style="height: 50px; width: 50px;">
+    CRT ATTENDANCE SYSTEM
+    </div>
+</nav>
+
+<div class="wrapper">
+    <header class="topbar">
+        <h1>Your Attendance Here</h1>
+        <button class="logout" onclick="logout()">Logout</button>
+    </header>
+
+    <main class="container">
+        <div class="card">
+            <a class="back-link" href="studentSection.html"><button class="back-btn">← Back</button></a>
+
+            <div class="attendance-request-container" id="attendanceRequestContainer" style="display:none;">
+                <h3>New Attendance Request</h3>
+                <div id="requestList"></div>
+                
+                <div id="scannerArea" style="text-align: center; margin-top: 10px;">
+                    <button id="cameraBtn" class="scan-btn" onclick="startScanner()">📷 Open Camera to Scan</button>
+                    <div id="reader"></div>
+                </div>
+            </div>
+
+            <h2 class="welcome" id="welcomeMsg">Welcome, Student</h2>
+            <p class="subtitle" id="subjectLabel">Subject: —</p>
+
+            <div class="table-section">
+                <h3>Your Attendance History</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Date</th>
+                            <th>Time In</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyBody">
+                        <tr><td colspan="4" style="text-align:center; color:#aaa;">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+    // -- Supabase --
+    const { createClient } = supabase;
+    const db = createClient(
+        'https://cvmfvndfmzmhywttaujy.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN2bWZ2bmRmbXptaHl3dHRhdWp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMjgwOTQsImV4cCI6MjA4ODcwNDA5NH0.1mzfGgPWNPRyb1pwra2KTrayCzAqhyn7p5CGEb4UItE'
+    );
+
+    // -- Session --
+    const user = JSON.parse(sessionStorage.getItem('user'));
+    const subject = JSON.parse(sessionStorage.getItem('subject'));
+    let html5QrCode; // For camera control
+    let activeReqId = null;
+
+    if (!user || !subject) window.location.href = 'index.html';
+
+    function logout() {
+        sessionStorage.removeItem('user');
+        sessionStorage.removeItem('subject');
+        window.location.href = 'index.html';
+    }
+
+    document.getElementById('welcomeMsg').textContent = 'Welcome, ' + user.name;
+    document.getElementById('subjectLabel').textContent = 'Subject: ' + subject.name;
+
+    // -- Camera Functions --
+    function startScanner() {
+        const reader = document.getElementById('reader');
+        const btn = document.getElementById('cameraBtn');
+        
+        reader.style.display = 'block';
+        btn.style.display = 'none';
+
+        html5QrCode = new Html5Qrcode("reader");
+        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+        html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => {
+            // Success logic
+            try {
+                const url = new URL(decodedText);
+                const scannedId = url.searchParams.get("id");
+
+                if (scannedId === activeReqId) {
+                    html5QrCode.stop().then(() => {
+                        reader.style.display = 'none';
+                        markAttendance(activeReqId, new Date().toLocaleDateString('en-CA'));
+                    });
+                } else {
+                    alert("This QR code is not for this session.");
+                }
+            } catch (e) {
+                alert("Invalid QR format.");
+            }
+        }).catch(err => alert("Camera Error: " + err));
+    }
+
+    // -- Helpers --
+    function getPHTime() {
+        return new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+    }
+
+    // -- Load History --
+    async function loadHistory() {
+        const { data, error } = await db.from('attendance').select('*').eq('student_id', user.id).eq('subject_id', subject.id).order('created_at', { ascending: false });
+        const tbody = document.getElementById('historyBody');
+        if (error || !data) return;
+
+        tbody.innerHTML = data.map(r => `
+            <tr>
+                <td>${r.student_name || user.name}</td>
+                <td>${r.date}</td>
+                <td>${r.time_in || '—'}</td>
+                <td style="font-weight:bold; color:${r.status === 'Approved' ? '#4ade80' : '#fbbf24'}">${r.status}</td>
+            </tr>
+        `).join('');
+    }
+
+    // -- Check Request --
+    async function checkRequest() {
+        const { data: request } = await db.from('attendance_requests').select('*').eq('subject_id', subject.id).eq('is_open', true).order('created_at', { ascending: false }).limit(1).maybeSingle();
+        const container = document.getElementById('attendanceRequestContainer');
+        const requestList = document.getElementById('requestList');
+
+        if (!request || new Date() > new Date(request.expires_at)) {
+            container.style.display = 'none';
+            return;
+        }
+
+        activeReqId = request.id;
+        const { data: already } = await db.from('attendance').select('id, status').eq('student_id', user.id).eq('request_id', request.id).maybeSingle();
+        
+        container.style.display = 'block';
+
+        if (already) {
+            requestList.innerHTML = `<div class="request-card"><span>Already marked — Status: <strong>${already.status}</strong></span></div>`;
+            document.getElementById('scannerArea').style.display = 'none';
+        } else {
+            requestList.innerHTML = `<span>Attendance is open! Click below to scan.</span>`;
+            document.getElementById('scannerArea').style.display = 'block';
+            document.getElementById('cameraBtn').style.display = 'inline-block';
+        }
+    }
+
+    // -- Mark Attendance --
+    async function markAttendance(requestId, date) {
+        const ph = getPHTime();
+        const time = ph.toTimeString().split(' ')[0];
+
+        const { error } = await db.from('attendance').insert({
+            student_id: user.id,
+            subject_id: subject.id,
+            request_id: requestId,
+            student_name: user.name,
+            date,
+            time_in: time,
+            status: 'Present' // Marked present automatically via QR
+        });
+
+        if (error) {
+            alert('Error: ' + error.message);
+        } else {
+            alert('Attendance Marked Successfully!');
+            checkRequest();
+            loadHistory();
+        }
+    }
+
+    checkRequest();
+    loadHistory();
+    setInterval(() => { checkRequest(); loadHistory(); }, 15000);
+</script>
+</body>
+</html>

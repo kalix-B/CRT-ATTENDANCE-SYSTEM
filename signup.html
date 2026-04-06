@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Create Account</title>
+<link rel="stylesheet" href="signup.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+
+<body>
+<nav class="navbar">
+    <div class="logo">
+    <img src="logo.jpg"alt="Logo" style="height: 50px; width: 50px;">
+   <span>CRT ATTENDANCE SYSTEM</span>
+    </div>
+</nav>
+
+
+<div class="wrapper">
+
+    <div class="card">
+
+        <button class="back-btn" onclick="goBack()">← Back</button>
+        <h1 class="title">Create Account</h1>
+        <p class="subtitle" style="font-size: 20px; color: rgba(255, 255, 255, 0.507);">Register to access the attendance system</p>
+
+        <p id="error-msg" style="color:#ff6b6b; text-align:center; font-size:13px; margin-bottom:10px; display:none;"></p>
+        <p id="success-msg" style="color:#6bffb8; text-align:center; font-size:13px; margin-bottom:10px; display:none;"></p>
+
+        <form class="form" onsubmit="handleSignup(event)">
+
+            <input type="text" id="name" placeholder="Full Name" required>
+
+            <input type="email" id="email" placeholder="Email Address" required>
+
+            <select id="role" required>
+                <option value="">Select Role</option>
+                <option value="student">Student</option>
+                <option value="teacher">Teacher</option>
+            </select>
+
+            <input type="password" id="password" placeholder="Password" required>
+
+            <input type="password" id="confirm-password" placeholder="Confirm Password" required>
+
+            <button class="login-btn" type="submit" id="signup-btn">Create Account</button>
+
+        </form>
+
+        <p class="signup-text">
+            Already have an account?
+            <a href="index.html">Sign in here</a>
+        </p>
+
+    </div>
+
+</div>
+
+<script>
+    // Supabase Client (Old Project)
+    const { createClient } = supabase;
+    const db = createClient(
+        'https://cvmfvndfmzmhywttaujy.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN2bWZ2bmRmbXptaHl3dHRhdWp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMjgwOTQsImV4cCI6MjA4ODcwNDA5NH0.1mzfGgPWNPRyb1pwra2KTrayCzAqhyn7p5CGEb4UItE'
+    );
+
+    function goBack() {
+        window.history.back();
+    }
+
+    function showError(msg) {
+        const el = document.getElementById('error-msg');
+        el.textContent = msg;
+        el.style.display = 'block';
+        document.getElementById('success-msg').style.display = 'none';
+    }
+
+    function showSuccess(msg) {
+        const el = document.getElementById('success-msg');
+        el.textContent = msg;
+        el.style.display = 'block';
+        document.getElementById('error-msg').style.display = 'none';
+    }
+
+    async function handleSignup(e) {
+        e.preventDefault();
+
+        const name     = document.getElementById('name').value.trim();
+        const email    = document.getElementById('email').value.trim();
+        const role     = document.getElementById('role').value;
+        const password = document.getElementById('password').value;
+        const confirm  = document.getElementById('confirm-password').value;
+        const btn      = document.getElementById('signup-btn');
+
+        // Validation
+        if (!role) return showError('Please select a role.');
+        if (password !== confirm) return showError('Passwords do not match.');
+        if (password.length < 6) return showError('Password must be at least 6 characters.');
+
+        btn.textContent = 'Creating account...';
+        btn.disabled = true;
+
+        try {
+            const { error } = await db.auth.signUp({
+                email: email,
+                password: password,
+                options: {
+                    data: {
+                        name: name,
+                        role: role
+                    }
+                }
+            });
+
+            if (error) {
+                console.error(error);
+                showError(error.message);
+            } else {
+                showSuccess('Account created successfully! You can now login.');
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 2000);
+            }
+        } catch (err) {
+            console.error(err);
+            showError('An unexpected error occurred. Please try again.');
+        } finally {
+            btn.textContent = 'Create Account';
+            btn.disabled = false;
+        }
+    }
+</script>
+
+</body>
+</html>

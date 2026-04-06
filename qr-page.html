@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance QR Code</title>
+    <link rel="stylesheet" href="teacher.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body style="background: #111; color: white; display: flex; align-items: center; justify-content: center; height: 100vh; text-align: center;">
+
+    <div>
+        <h1 style="margin-bottom: 10px;">Scan to Mark Present</h1>
+        <p id="subjectName" style="color: #aaa; margin-bottom: 30px;"></p>
+        
+        <div id="qrcode" style="padding: 20px; background: white; display: inline-block; border-radius: 10px;"></div>
+        
+        <br><br>
+        <button onclick="window.history.back()" class="filter-btn" style="background: #333; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">
+            ← Back to Dashboard
+        </button>
+    </div>
+
+    <script>
+        const subject = JSON.parse(sessionStorage.getItem('subject'));
+        const requestId = sessionStorage.getItem('activeRequestId');
+
+        if (!subject || !requestId) {
+            alert("No active attendance session found.");
+            window.location.href = 'teacher.html';
+        }
+
+        document.getElementById('subjectName').textContent = "Subject: " + subject.name;
+
+        // --- GENERATE THE LINK ---
+        // Change 'your-site.com' to your actual GitHub Pages or live URL
+        const siteUrl = window.location.origin; 
+        const verifyLink = `${siteUrl}/verify.html?id=${requestId}`;
+
+        // Generate the QR
+        new QRCode(document.getElementById("qrcode"), {
+            text: verifyLink,
+            width: 300,
+            height: 300,
+            colorDark : "#000000",
+            colorLight : "#ffffff",
+            correctLevel : QRCode.CorrectLevel.H
+        });
+
+        console.log("Students will be sent to:", verifyLink);
+    </script>
+</body>
+</html>

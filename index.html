@@ -1,0 +1,122 @@
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Attendance System - Login</title>
+        <link rel="stylesheet" href="login.css">
+        <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    </head>
+
+    <body>
+    <nav class="navbar">
+        <div class="logo">
+            <img src="logo.jpg" alt="Logo" style="height: 50px; width: 50px;">
+            CRT ATTENDANCE SYSTEM
+        </div>
+    </nav>
+
+    <div class="wrapper">
+        <div class="card">
+            <p class="subtitle" style="font-size: 20px; color: rgba(255, 255, 255, 0.507);">Sign in to continue</p>
+            <p id="error-msg" style="color:#ff6b6b; text-align:center; font-size:13px; margin-bottom:10px; display:none;"></p>
+
+            <form class="form" onsubmit="handleLogin(event)">
+                <input type="email" id="email" placeholder="Email" required>
+                <input type="password" id="password" placeholder="Password" required>
+                <button class="login-btn" type="submit" id="login-btn">Sign In</button>
+            </form>
+
+            <p class="signup-text">
+                Don't have an account?
+                <a href="signup.html">Sign up here</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+    const { createClient } = supabase;
+    const db = createClient(
+        'https://cvmfvndfmzmhywttaujy.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN2bWZ2bmRmbXptaHl3dHRhdWp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMjgwOTQsImV4cCI6MjA4ODcwNDA5NH0.1mzfGgPWNPRyb1pwra2KTrayCzAqhyn7p5CGEb4UItE'
+    );
+
+    // Auto redirect if already logged in
+    const activeUser = JSON.parse(sessionStorage.getItem('user'));
+    if (activeUser?.role) {
+        redirectUser(activeUser.role);
+    }
+
+    function redirectUser(role) {
+        if (role === 'teacher') {
+            window.location.href = 'teacherSection.html';
+        } else {
+            window.location.href = 'studentSection.html';
+        }
+    }
+
+    function showError(msg) {
+        const el = document.getElementById('error-msg');
+        el.textContent = msg;
+        el.style.display = 'block';
+    }
+
+    async function handleLogin(e) {
+        e.preventDefault();
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        const btn = document.getElementById('login-btn');
+
+        btn.textContent = 'Signing in...';
+        btn.disabled = true;
+
+        try {
+            const { data: authData, error } = await db.auth.signInWithPassword({
+                email: email,
+                password: password
+            });
+
+            if (error) {
+                showError('Invalid email or password');
+                return;
+            }
+
+            // FIX: Changed .single() to .maybeSingle() to prevent the coercion error
+            const { data: profile, error: profileError } = await db
+                .from('users')
+                .select('name, role')
+                .eq('id', authData.user.id)
+                .maybeSingle(); 
+
+            if (profileError) {
+                console.error("Database Error:", profileError.message);
+                showError('Database error. Please try again.');
+                return;
+            }
+
+            if (!profile) {
+                showError('User profile not found in database.');
+                return;
+            }
+
+            // Save to SessionStorage
+            sessionStorage.setItem('user', JSON.stringify({
+                id: authData.user.id,
+                email: authData.user.email,
+                name: profile.name,
+                role: profile.role
+            }));
+
+            redirectUser(profile.role);
+
+        } catch (err) {
+            console.error("Catch Error:", err);
+            showError('Login failed. Please try again.');
+        } finally {
+            btn.textContent = 'Sign In';
+            btn.disabled = false;
+        }
+    }
+</script>
+    </body>
+    </html>

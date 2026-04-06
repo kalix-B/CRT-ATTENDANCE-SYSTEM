@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Select Subject</title>
+<link rel="stylesheet" href="teacherSection.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<nav class="navbar">
+        <div class="logo">
+            <img src="logo.jpg" alt="Logo" style="height: 50px; width: 50px;">
+            CRT ATTENDANCE SYSTEM
+        </div>
+    </nav>
+
+<div class="wrapper">
+    <div class="card">
+        <!-- Back Button -->
+        <a class="back-link" href="index.html"><button class="back-btn">← Back</button></a>
+        <p class="subtitle">Your Classes</p>
+
+        <div class="subject-grid" id="subjectGrid">
+            <!-- Subjects will be loaded here dynamically -->
+            <button class="subject-btn add-btn" id="addSubjectBtn">+</button>
+        </div>
+    </div>
+</div>
+
+<!-- Add Subject Modal -->
+<div class="modal" id="addSubjectModal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2>Create Subject</h2> <br>
+        <input type="text" placeholder="Subject Name" id="subjectNameInput">
+        <input type="text" placeholder="Subject ID (e.g. MATH101)" id="subjectCodeInput">
+        <input type="password" placeholder="Password" id="subjectPasswordInput">
+        <p id="modal-error" style="color:#ff6b6b; font-size:13px; margin-top:8px; display:none;"></p>
+        <p id="modal-success" style="color:#6bffb8; font-size:13px; margin-top:8px; display:none;"></p>
+        <button class="continue-btn" id="addSubjectConfirmBtn">Add</button>
+    </div>
+</div>
+
+<script>
+    // ── Supabase setup ──
+    const { createClient } = supabase;
+    const db = createClient(
+        'https://cvmfvndfmzmhywttaujy.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN2bWZ2bmRmbXptaHl3dHRhdWp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMjgwOTQsImV4cCI6MjA4ODcwNDA5NH0.1mzfGgPWNPRyb1pwra2KTrayCzAqhyn7p5CGEb4UItE'
+    );
+
+    // ── Get logged-in teacher from sessionStorage ──
+    const user = JSON.parse(sessionStorage.getItem('user'));
+    if (!user) window.location.href = 'index.html';
+
+    // ── Modal elements ──
+    const modal      = document.getElementById('addSubjectModal');
+    const closeBtn   = document.querySelector('.modal .close');
+    const confirmBtn = document.getElementById('addSubjectConfirmBtn');
+
+    // ── Open/close modal ──
+    closeBtn.addEventListener('click', () => modal.style.display = 'none');
+    window.addEventListener('click', (e) => {
+        if (e.target === modal) modal.style.display = 'none';
+    });
+
+    // ── Helpers ──
+    function clearModal() {
+        document.getElementById('subjectNameInput').value     = '';
+        document.getElementById('subjectCodeInput').value     = '';
+        document.getElementById('subjectPasswordInput').value = '';
+        document.getElementById('modal-error').style.display   = 'none';
+        document.getElementById('modal-success').style.display = 'none';
+        confirmBtn.textContent = 'Add';
+        confirmBtn.disabled = false;
+    }
+
+    function showModalError(msg) {
+        document.getElementById('modal-error').textContent    = msg;
+        document.getElementById('modal-error').style.display  = 'block';
+        document.getElementById('modal-success').style.display = 'none';
+    }
+
+    function showModalSuccess(msg) {
+        document.getElementById('modal-success').textContent   = msg;
+        document.getElementById('modal-success').style.display = 'block';
+        document.getElementById('modal-error').style.display   = 'none';
+    }
+
+    // ── Load subjects from database ──
+    async function loadSubjects() {
+        const { data, error } = await db
+            .from('subjects')
+            .select('*')
+            .eq('created_by', user.id)
+            .order('created_at', { ascending: true });
+
+        if (error) { console.log('Error loading subjects:', error.message); return; }
+
+        const grid = document.getElementById('subjectGrid');
+        grid.innerHTML = '';
+
+        // Render each subject
+        data.forEach(subject => {
+    const btn = document.createElement('button');
+    btn.className = 'subject-btn';
+    btn.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:10px;';
+
+    const label = document.createElement('span');
+    label.textContent = subject.name;
+
+    const delBtn = document.createElement('span');
+    delBtn.textContent = '✕';
+    delBtn.style.cssText = `
+        background: #ef4444;
+        color: white;
+        border-radius: 50%;
+        width: 18px;
+        height: 18px;
+        font-size: 10px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    `;
+    delBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const confirmed = confirm('Delete "' + subject.name + '"? This cannot be undone.');
+        if (!confirmed) return;
+
+        const { error } = await db
+            .from('subjects')
+            .delete()
+            .eq('id', subject.id);
+
+        if (error) { alert('Failed to delete: ' + error.message); return; }
+        loadSubjects();
+    });
+
+    btn.appendChild(label);
+    btn.appendChild(delBtn);
+    btn.addEventListener('click', () => {
+        sessionStorage.setItem('subject', JSON.stringify(subject));
+        window.location.href = 'teacher.html';
+    });
+
+    grid.appendChild(btn);
+});
+
+        // Re-add the + button at the end
+        const addButton = document.createElement('button');
+        addButton.className   = 'subject-btn add-btn';
+        addButton.textContent = '+';
+        addButton.addEventListener('click', () => {
+            modal.style.display = 'flex';
+            clearModal();
+        });
+        grid.appendChild(addButton);
+    }
+
+    // ── Add new subject ──
+    confirmBtn.addEventListener('click', async () => {
+        const name     = document.getElementById('subjectNameInput').value.trim();
+        const code     = document.getElementById('subjectCodeInput').value.trim();
+        const password = document.getElementById('subjectPasswordInput').value;
+
+        if (!name)     return showModalError('Please enter a subject name.');
+        if (!code)     return showModalError('Please enter a subject ID.');
+        if (!password) return showModalError('Please enter a password.');
+
+        confirmBtn.textContent = 'Adding...';
+        confirmBtn.disabled    = true;
+
+        // Check if subject code already taken
+        const { data: existing } = await db
+            .from('subjects')
+            .select('id')
+            .eq('subject_code', code)
+            .maybeSingle();
+
+        if (existing) {
+            showModalError('That Subject ID is already taken.');
+            confirmBtn.textContent = 'Add';
+            confirmBtn.disabled    = false;
+            return;
+        }
+
+        const { error } = await db.from('subjects').insert({
+            name,
+            subject_code: code,
+            password,
+            created_by: user.id
+        });
+
+        if (error) {
+            showModalError('Failed: ' + error.message);
+            confirmBtn.textContent = 'Add';
+            confirmBtn.disabled    = false;
+            return;
+        }
+
+        showModalSuccess('Subject added!');
+        setTimeout(() => {
+            modal.style.display = 'none';
+            loadSubjects();
+        }, 1000);
+    });
+
+    // ── Load on page open ──
+    loadSubjects();
+</script>
+
+</body>
+</html>
